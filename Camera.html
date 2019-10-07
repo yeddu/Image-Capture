@@ -1,0 +1,113 @@
+<html>
+<head>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+<!-- Latest compiled and minified CSS -->
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+
+<!-- Optional theme -->
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap-theme.min.css" integrity="sha384-rHyoN1iRsVXV4nD0JutlnGaslCJuC7uwjduW9SVrLvRYooPp2bWYgmgJQIXwl/Sp" crossorigin="anonymous">
+
+<!-- Latest compiled and minified JavaScript -->
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>
+</head>
+<body>
+<div class="container">
+	<div class="col l12 m12 s12">
+		<div class="row">
+			<div class="select">
+				<label for="videoSource">Video source: </label><select id="videoSource"></select>
+			</div>
+		</div>
+		<div class="row">
+			<div class="col l6 m6 s6"><video autoplay></video></div>
+			<div class="col l6 m6 s6"><canvas id='takePhotoCanvas'></canvas></div>
+		</div>
+		<div class="row">
+			<div class="input-field center-align">
+				<button type="button" class=" btn waves-effect" id="takePhotoButton">Take Photo</button>
+			</div>
+		</div>
+		<div class="row" id="FileUpload-photo"></div>
+	</div>
+</div>
+	<script type="text/javascript">
+		var videoElement = document.querySelector('video');
+		var videoSelect = document.querySelector('select#videoSource');
+		var imageCapture;
+		var imageCapturedData;
+
+		navigator.mediaDevices.enumerateDevices()
+				.then(gotDevices).then(getStream).catch(handleError);
+		videoSelect.onchange = getStream;
+		function gotDevices(deviceInfos) {
+			for (var i = 0; i !== deviceInfos.length; ++i) {
+				var deviceInfo = deviceInfos[i];
+				var option = document.createElement('option');
+				option.value = deviceInfo.deviceId;
+				if (deviceInfo.kind === 'videoinput') {
+					option.text = deviceInfo.label || 'camera ' +
+							(videoSelect.length + 1);
+					videoSelect.appendChild(option);
+				} else {
+					console.log('Found one other kind of source/device: ', deviceInfo);
+				}
+			}
+			//$("#videoSource").material_select();
+		}
+		function getStream() {
+			if (window.stream) {
+				window.stream.getTracks().forEach(function (track) {
+					track.stop();
+				});
+			}
+			var constraints = {
+				video: {
+					deviceId: {exact: videoSelect.value}
+				}
+			};
+			navigator.mediaDevices.getUserMedia(constraints).then(gotStream).catch(handleError);
+		}
+		function gotStream(stream) {
+			window.stream = stream; // make stream available to console
+			videoElement.srcObject = stream;
+			const track = stream.getVideoTracks()[0];
+			imageCapture = new ImageCapture(track);
+		}
+
+		function handleError(error) {
+			console.log('Error: ', error);
+		}
+
+		function onTakePhotoButtonClick() {
+			imageCapture.takePhoto()
+					.then(blob => createImageBitmap(blob))
+					.then(imageBitmap => {
+						const canvas = document.querySelector('#takePhotoCanvas');
+						drawCanvas(canvas, imageBitmap);
+						document.querySelector('#confirmPhoto').disabled = false;
+					});
+		}
+
+		/* Utils */
+
+		function drawCanvas(canvas, img) {
+			canvas.width = getComputedStyle(canvas).width.split('px')[0];
+			canvas.height = getComputedStyle(canvas).height.split('px')[0];
+			let ratio = Math.min(canvas.width / img.width, canvas.height / img.height);
+			let x = (canvas.width - img.width * ratio) / 2;
+			let y = (canvas.height - img.height * ratio) / 2;
+			canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
+			canvas.getContext('2d').drawImage(img, 0, 0, img.width, img.height,
+					x, y, img.width * ratio, img.height * ratio);
+			imageCapturedData = canvas.toDataURL('image/png');
+			document.getElementById("FileUpload-photo").value = imageCapturedData;
+		}
+		document.querySelector('video').addEventListener('play', function () {
+			document.querySelector('#takePhotoButton').disabled = false;
+		});
+		document.querySelector('#takePhotoButton').addEventListener('click', onTakePhotoButtonClick);
+	
+	</script>
+	
+	</body>
+</html>
